@@ -7,7 +7,7 @@ export const GREETING = 'Готові допомогти зараз з будь-
 export const PLACEHOLDER_INPUT = 'Напишіть своє питання';
 export const STARTER_PROMPTS: string[] = [];
 
-export function getThemeConfig(scheme: ColorScheme) {
+export function getThemeConfig(_scheme: ColorScheme) {
   return {
     radius: 'pill' as const,
     density: 'normal' as const,
@@ -18,7 +18,7 @@ export function getThemeConfig(scheme: ColorScheme) {
       }
     },
     typography: {
-      baseSize: 16,
+      baseSize: 16 as const,
       fontFamily: '"OpenAI Sans", system-ui, sans-serif'
     }
   };
