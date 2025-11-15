@@ -14,7 +14,7 @@ export function getThemeConfig(_scheme: ColorScheme) {
     color: {
       accent: { 
         primary: '#44aa00', 
-        level: 1 
+        level: 1 as const
       }
     },
     typography: {
