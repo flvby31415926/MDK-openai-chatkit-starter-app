@@ -32,3 +32,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+
+openai-chatkit {
+  --chatkit-color-primary: #44aa00 !important;
+  --chatkit-color-surface-bg: #f5f5f5 !important;
+  --chatkit-color-surface-fg: #2d7000 !important;
+  --chatkit-radius: 24px !important;
+  --chatkit-font-size: 16px !important;
+}
