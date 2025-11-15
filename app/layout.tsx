@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgentKit demo",
-  description: "Demo of ChatKit with hosted workflow",
+  title: "Мебельный Дом Колобовых",
+  description: "Чат с компание МДК",
 };
 
 export default function RootLayout({
