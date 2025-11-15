@@ -1,24 +1,20 @@
-import type { ChatKitOptions } from "@openai/chatkit";
+import type { ColorScheme } from "@/hooks/useColorScheme";
 
-export const chatKitConfig: ChatKitOptions = {
-  theme: {
-    colorScheme: 'light',
-    radius: 'pill',
-    density: 'normal',
+export const WORKFLOW_ID = process.env.NEXT_PUBLIC_CHATKIT_WORKFLOW_ID || "";
+export const CREATE_SESSION_ENDPOINT = "/api/create-session";
+
+export const GREETING = 'Готовы помочь сейчас по любому мебельному вопросу';
+export const PLACEHOLDER_INPUT = 'Напишите свой вопрос';
+export const STARTER_PROMPTS: string[] = [];
+
+export function getThemeConfig(scheme: ColorScheme) {
+  return {
+    radius: 'pill' as const,
+    density: 'normal' as const,
     color: {
-      grayscale: {
-        hue: 360,
-        tint: 9,
-        shade: -4
-      },
-      accent: {
-        primary: '#44aa00',
-        level: 1
-      },
-      surface: {
-        background: '#f5f5f5',
-        foreground: '#2d7000'
-      }
+      grayscale: { hue: 360, tint: 9, shade: -4 },
+      accent: { primary: '#44aa00', level: 1 },
+      surface: { background: '#f5f5f5', foreground: '#2d7000' }
     },
     typography: {
       baseSize: 16,
@@ -34,15 +30,5 @@ export const chatKitConfig: ChatKitOptions = {
         }
       ]
     }
-  },
-  composer: {
-    placeholder: 'Напишите свой вопрос',
-    attachments: {
-      enabled: false
-    },
-  },
-  startScreen: {
-    greeting: 'Готовы помочь сейчас по любому мебельному вопросу',
-    prompts: [],
-  },
-};
+  };
+}
