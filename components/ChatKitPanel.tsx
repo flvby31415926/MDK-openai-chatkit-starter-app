@@ -53,7 +53,7 @@ export function ChatKitPanel({
   const [errors, setErrors] = useState<ErrorState>(() => createInitialErrors());
   const [isInitializingSession, setIsInitializingSession] = useState(true);
   const isMountedRef = useRef(true);
-  const [scriptStatus, setScriptStatus] = useState<
+  const [scriptStatus, setScriptStatus] = useState
     "pending" | "ready" | "error"
   >(() =>
     isBrowser && window.customElements?.get("openai-chatkit")
@@ -193,7 +193,6 @@ export function ChatKitPanel({
           body: JSON.stringify({
             workflow: { id: WORKFLOW_ID },
             chatkit_configuration: {
-              // enable attachments
               file_upload: {
                 enabled: true,
               },
@@ -265,17 +264,36 @@ export function ChatKitPanel({
     api: { getClientSecret },
     theme: {
       colorScheme: theme,
-      ...getThemeConfig(theme),
+      radius: 'pill',
+      density: 'normal',
+      color: {
+        grayscale: { hue: 360, tint: 9, shade: -4 },
+        accent: { primary: '#44aa00', level: 1 },
+        surface: { background: '#f5f5f5', foreground: '#2d7000' }
+      },
+      typography: {
+        baseSize: 16,
+        fontFamily: '"OpenAI Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        fontFamilyMono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace',
+        fontSources: [
+          {
+            family: 'OpenAI Sans',
+            src: 'https://cdn.openai.com/common/fonts/openai-sans/v2/OpenAISans-Regular.woff2',
+            weight: 400,
+            style: 'normal',
+            display: 'swap'
+          }
+        ]
+      }
     },
     startScreen: {
-      greeting: GREETING,
-      prompts: STARTER_PROMPTS,
+      greeting: 'Готовы помочь сейчас по любому мебельному вопросу',
+      prompts: [],
     },
     composer: {
-      placeholder: PLACEHOLDER_INPUT,
+      placeholder: 'Напишите свой вопрос',
       attachments: {
-        // Enable attachments
-        enabled: true,
+        enabled: false,
       },
     },
     threadItemActions: {
@@ -324,8 +342,6 @@ export function ChatKitPanel({
       processedFacts.current.clear();
     },
     onError: ({ error }: { error: unknown }) => {
-      // Note that Chatkit UI handles errors for your users.
-      // Thus, your app code doesn't need to display errors on UI.
       console.error("ChatKit error", error);
     },
   });
