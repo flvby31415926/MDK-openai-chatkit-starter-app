@@ -281,3 +281,20 @@ function extractUpstreamError(
   }
   return null;
 }
+
+
+body: JSON.stringify({
+  workflow: { id: WORKFLOW_ID },
+  chatkit_configuration: {
+    file_upload: { enabled: true },
+    theme: {
+      radius: 'pill',
+      density: 'normal',
+      color: {
+        grayscale: { hue: 360, tint: 9, shade: -4 },
+        accent: { primary: '#44aa00', level: 1 },
+        surface: { background: '#f5f5f5', foreground: '#2d7000' }
+      }
+    }
+  }
+}),
