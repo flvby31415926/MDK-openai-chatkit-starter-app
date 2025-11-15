@@ -1,5 +1,5 @@
-import App from "./App";
+import CustomChatUI from '@/components/CustomChatUI';
 
 export default function Home() {
-  return <App />;
+  return <CustomChatUI />;
 }
