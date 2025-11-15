@@ -238,14 +238,10 @@ async function safeParseJson<T>(req: Request): Promise<T | null> {
 function extractUpstreamError(
   payload: Record<string, unknown> | undefined
 ): string | null {
-  if (!payload) {
-    return null;
-  }
+  if (!payload) return null;
 
   const error = payload.error;
-  if (typeof error === "string") {
-    return error;
-  }
+  if (typeof error === "string") return error;
 
   if (
     error &&
@@ -257,15 +253,11 @@ function extractUpstreamError(
   }
 
   const details = payload.details;
-  if (typeof details === "string") {
-    return details;
-  }
+  if (typeof details === "string") return details;
 
   if (details && typeof details === "object" && "error" in details) {
     const nestedError = (details as { error?: unknown }).error;
-    if (typeof nestedError === "string") {
-      return nestedError;
-    }
+    if (typeof nestedError === "string") return nestedError;
     if (
       nestedError &&
       typeof nestedError === "object" &&
@@ -276,8 +268,6 @@ function extractUpstreamError(
     }
   }
 
-  if (typeof payload.message === "string") {
-    return payload.message;
-  }
+  if (typeof payload.message === "string") return payload.message;
   return null;
 }
