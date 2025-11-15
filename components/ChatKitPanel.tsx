@@ -1,229 +1,299 @@
-import React, { useState, useRef, useEffect } from 'react';
+"use client";
 
-export default function CustomChatUI() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Готовы помочь сейчас по любому мебельному вопросу' }
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChatKit, useChatKit } from "@openai/chatkit-react";
+import {
+  STARTER_PROMPTS,
+  PLACEHOLDER_INPUT,
+  GREETING,
+  CREATE_SESSION_ENDPOINT,
+  WORKFLOW_ID,
+  getThemeConfig,
+} from "@/lib/config";
+import { ErrorOverlay } from "./ErrorOverlay";
+import type { ColorScheme } from "@/hooks/useColorScheme";
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+export type FactAction = {
+  type: "save";
+  factId: string;
+  factText: string;
+};
+
+type ChatKitPanelProps = {
+  theme: ColorScheme;
+  onWidgetAction: (action: FactAction) => Promise<void>;
+  onResponseEnd: () => void;
+  onThemeRequest: (scheme: ColorScheme) => void;
+};
+
+type ErrorState = {
+  script: string | null;
+  session: string | null;
+  integration: string | null;
+  retryable: boolean;
+};
+
+const isBrowser = typeof window !== "undefined";
+const isDev = process.env.NODE_ENV !== "production";
+
+const createInitialErrors = (): ErrorState => ({
+  script: null,
+  session: null,
+  integration: null,
+  retryable: false,
+});
+
+export function ChatKitPanel({
+  theme,
+  onWidgetAction,
+  onResponseEnd,
+  onThemeRequest,
+}: ChatKitPanelProps) {
+  const processedFacts = useRef(new Set<string>());
+  const [errors, setErrors] = useState<ErrorState>(() => createInitialErrors());
+  const [isInitializingSession, setIsInitializingSession] = useState(true);
+  const isMountedRef = useRef(true);
+  const [scriptStatus, setScriptStatus] = useState<"pending" | "ready" | "error">(
+    () => (isBrowser && window.customElements?.get("openai-chatkit") ? "ready" : "pending")
+  );
+  const [widgetInstanceKey, setWidgetInstanceKey] = useState(0);
+
+  const setErrorState = useCallback((updates: Partial<ErrorState>) => {
+    setErrors((current) => ({ ...current, ...updates }));
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  useEffect(() => {
+    if (!isBrowser) return;
 
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setLoading(true);
+    let timeoutId: number | undefined;
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
+    const handleLoaded = () => {
+      if (!isMountedRef.current) return;
+      setScriptStatus("ready");
+      setErrorState({ script: null });
+    };
+
+    const handleError = (event: Event) => {
+      console.error("Failed to load chatkit.js", event);
+      if (!isMountedRef.current) return;
+      setScriptStatus("error");
+      const detail = (event as CustomEvent<unknown>)?.detail ?? "unknown error";
+      setErrorState({ script: `Error: ${detail}`, retryable: false });
+      setIsInitializingSession(false);
+    };
+
+    window.addEventListener("chatkit-script-loaded", handleLoaded);
+    window.addEventListener("chatkit-script-error", handleError as EventListener);
+
+    if (window.customElements?.get("openai-chatkit")) {
+      handleLoaded();
+    } else if (scriptStatus === "pending") {
+      timeoutId = window.setTimeout(() => {
+        if (!window.customElements?.get("openai-chatkit")) {
+          handleError(
+            new CustomEvent("chatkit-script-error", {
+              detail: "ChatKit web component is unavailable.",
+            })
+          );
+        }
+      }, 5000);
+    }
+
+    return () => {
+      window.removeEventListener("chatkit-script-loaded", handleLoaded);
+      window.removeEventListener("chatkit-script-error", handleError as EventListener);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [scriptStatus, setErrorState]);
+
+  const isWorkflowConfigured = Boolean(WORKFLOW_ID && !WORKFLOW_ID.startsWith("wf_replace"));
+
+  useEffect(() => {
+    if (!isWorkflowConfigured && isMountedRef.current) {
+      setErrorState({
+        session: "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID in .env.local",
+        retryable: false,
       });
+      setIsInitializingSession(false);
+    }
+  }, [isWorkflowConfigured, setErrorState]);
 
-      const data = await res.json();
-      
-      if (data.reply) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Помилка з\'єднання' }]);
+  const handleResetChat = useCallback(() => {
+    processedFacts.current.clear();
+    if (isBrowser) {
+      setScriptStatus(window.customElements?.get("openai-chatkit") ? "ready" : "pending");
+    }
+    setIsInitializingSession(true);
+    setErrors(createInitialErrors());
+    setWidgetInstanceKey((prev) => prev + 1);
+  }, []);
+
+  const getClientSecret = useCallback(
+    async (currentSecret: string | null) => {
+      if (!isWorkflowConfigured) {
+        const detail = "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID in .env.local";
+        if (isMountedRef.current) {
+          setErrorState({ session: detail, retryable: false });
+          setIsInitializingSession(false);
+        }
+        throw new Error(detail);
       }
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Помилка з\'єднання' }]);
-    }
-    
-    setLoading(false);
-  };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+      if (isMountedRef.current) {
+        if (!currentSecret) setIsInitializingSession(true);
+        setErrorState({ session: null, integration: null, retryable: false });
+      }
 
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '90vh',
-      maxWidth: '800px',
-      margin: '0 auto',
-      background: '#f5f5f5',
-      borderRadius: '24px',
-      overflow: 'hidden',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-    }}>
-      {/* Заголовок */}
-      <div style={{
-        padding: '20px',
-        background: '#44aa00',
-        color: 'white',
-        fontWeight: '600',
-        fontSize: '18px',
-        borderRadius: '24px 24px 0 0'
-      }}>
-        Мебельний Дім Колобових
-      </div>
+      try {
+        const response = await fetch(CREATE_SESSION_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workflow: { id: WORKFLOW_ID },
+            chatkit_configuration: {
+              file_upload: { enabled: false },
+            },
+          }),
+        });
 
-      {/* Сообщения */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-      }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
-          }}>
-            <div style={{
-              maxWidth: '70%',
-              padding: '12px 16px',
-              borderRadius: '24px',
-              background: msg.role === 'user' ? '#44aa00' : 'white',
-              color: msg.role === 'user' ? 'white' : '#2d7000',
-              fontSize: '15px',
-              lineHeight: '1.5',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}>
-              {msg.content}
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-start'
-          }}>
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '24px',
-              background: 'white',
-              color: '#2d7000',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}>
-              <div style={{
-                display: 'flex',
-                gap: '4px'
-              }}>
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: '#44aa00',
-                  animation: 'bounce 1.4s infinite ease-in-out both',
-                  animationDelay: '-0.32s'
-                }} />
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: '#44aa00',
-                  animation: 'bounce 1.4s infinite ease-in-out both',
-                  animationDelay: '-0.16s'
-                }} />
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: '#44aa00',
-                  animation: 'bounce 1.4s infinite ease-in-out both'
-                }} />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Поле ввода */}
-      <div style={{
-        padding: '20px',
-        background: 'white',
-        borderTop: '1px solid #e0e0e0'
-      }}>
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'flex-end'
-        }}>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Напишите свой вопрос"
-            disabled={loading}
-            rows={1}
-            style={{
-              flex: 1,
-              padding: '12px 16px',
-              border: '2px solid #e0e0e0',
-              borderRadius: '24px',
-              fontSize: '15px',
-              fontFamily: 'system-ui, sans-serif',
-              resize: 'none',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-              background: '#fafafa'
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#44aa00'}
-            onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            style={{
-              padding: '12px 24px',
-              background: loading || !input.trim() ? '#ccc' : '#44aa00',
-              color: 'white',
-              border: 'none',
-              borderRadius: '24px',
-              fontSize: '15px',
-              fontWeight: '600',
-              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={(e) => {
-              if (!loading && input.trim()) {
-                e.target.style.background = '#3a9000';
-                e.target.style.transform = 'scale(1.02)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = loading || !input.trim() ? '#ccc' : '#44aa00';
-              e.target.style.transform = 'scale(1)';
-            }}
-          >
-            Відправити
-          </button>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes bounce {
-          0%, 80%, 100% { 
-            transform: scale(0);
-          } 
-          40% { 
-            transform: scale(1);
+        const raw = await response.text();
+        let data: Record<string, unknown> = {};
+        if (raw) {
+          try {
+            data = JSON.parse(raw) as Record<string, unknown>;
+          } catch (parseError) {
+            console.error("Failed to parse session response", parseError);
           }
         }
-      `}</style>
+
+        if (!response.ok) {
+          const detail = extractErrorDetail(data, response.statusText);
+          console.error("Create session failed", { status: response.status, body: data });
+          throw new Error(detail);
+        }
+
+        const clientSecret = data?.client_secret as string | undefined;
+        if (!clientSecret) throw new Error("Missing client secret");
+
+        if (isMountedRef.current) {
+          setErrorState({ session: null, integration: null });
+        }
+
+        return clientSecret;
+      } catch (error) {
+        console.error("Failed to create ChatKit session", error);
+        const detail = error instanceof Error ? error.message : "Unable to start session.";
+        if (isMountedRef.current) {
+          setErrorState({ session: detail, retryable: false });
+        }
+        throw error instanceof Error ? error : new Error(detail);
+      } finally {
+        if (isMountedRef.current && !currentSecret) {
+          setIsInitializingSession(false);
+        }
+      }
+    },
+    [isWorkflowConfigured, setErrorState]
+  );
+
+  const chatkit = useChatKit({
+    api: { getClientSecret },
+    locale: 'uk-UA',
+    theme: {
+      colorScheme: 'light',
+      ...getThemeConfig(theme),
+    },
+    startScreen: {
+      greeting: GREETING,
+      prompts: STARTER_PROMPTS,
+    },
+    composer: {
+      placeholder: PLACEHOLDER_INPUT,
+      attachments: { enabled: false },
+    },
+    threadItemActions: {
+      feedback: false,
+    },
+    onResponseEnd: () => {
+      onResponseEnd();
+    },
+    onResponseStart: () => {
+      setErrorState({ integration: null, retryable: false });
+    },
+    onThreadChange: () => {
+      processedFacts.current.clear();
+    },
+    onError: ({ error }: { error: unknown }) => {
+      console.error("ChatKit error", error);
+    },
+  });
+
+  const activeError = errors.session ?? errors.integration;
+  const blockingError = errors.script ?? activeError;
+
+  return (
+    <div className="relative pb-8 flex h-[90vh] w-full rounded-2xl flex-col overflow-hidden bg-white shadow-sm transition-colors dark:bg-slate-900">
+      <ChatKit
+        key={widgetInstanceKey}
+        control={chatkit.control}
+        className={
+          blockingError || isInitializingSession
+            ? "pointer-events-none opacity-0"
+            : "block h-full w-full"
+        }
+      />
+      <ErrorOverlay
+        error={blockingError}
+        fallbackMessage={
+          blockingError || !isInitializingSession ? null : "Завантаження сесії..."
+        }
+        onRetry={blockingError && errors.retryable ? handleResetChat : null}
+        retryLabel="Перезапустити чат"
+      />
     </div>
   );
+}
+
+function extractErrorDetail(
+  payload: Record<string, unknown> | undefined,
+  fallback: string
+): string {
+  if (!payload) return fallback;
+
+  const error = payload.error;
+  if (typeof error === "string") return error;
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  const details = payload.details;
+  if (typeof details === "string") return details;
+
+  if (details && typeof details === "object" && "error" in details) {
+    const nestedError = (details as { error?: unknown }).error;
+    if (typeof nestedError === "string") return nestedError;
+    if (
+      nestedError &&
+      typeof nestedError === "object" &&
+      "message" in nestedError &&
+      typeof (nestedError as { message?: unknown }).message === "string"
+    ) {
+      return (nestedError as { message: string }).message;
+    }
+  }
+
+  if (typeof payload.message === "string") return payload.message;
+  return fallback;
 }
