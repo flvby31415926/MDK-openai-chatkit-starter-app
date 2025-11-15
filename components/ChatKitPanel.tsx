@@ -232,6 +232,9 @@ export function ChatKitPanel({
     onError: ({ error }: { error: unknown }) => {
       console.error("ChatKit error", error);
     },
+    history: { 
+  enabled: false 
+    },
   });
 
   const activeError = errors.session ?? errors.integration;
