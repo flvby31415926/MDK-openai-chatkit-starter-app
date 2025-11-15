@@ -1,5 +1,5 @@
-import CustomChatUI from '@/components/CustomChatUI';
+import { MainLayout } from "@/components/MainLayout";
 
 export default function Home() {
-  return <CustomChatUI />;
+  return <MainLayout />;
 }
