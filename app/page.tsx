@@ -1,5 +1,5 @@
-import { MainLayout } from "@/components/MainLayout";
+import { ChatKitApp } from "@/components/ChatKitApp";
 
 export default function Home() {
-  return <MainLayout />;
+  return <ChatKitApp />;
 }
