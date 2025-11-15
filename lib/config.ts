@@ -1,11 +1,12 @@
 import type { ColorScheme } from "@/hooks/useColorScheme";
+import type { StartScreenPrompt } from "@openai/chatkit-react";
 
 export const WORKFLOW_ID = process.env.NEXT_PUBLIC_CHATKIT_WORKFLOW_ID || "";
 export const CREATE_SESSION_ENDPOINT = "/api/create-session";
 
 export const GREETING = 'Готові допомогти зараз з будь-якого меблевого питання';
 export const PLACEHOLDER_INPUT = 'Напишіть своє питання';
-export const STARTER_PROMPTS: string[] = [];
+export const STARTER_PROMPTS: StartScreenPrompt[] = [];
 
 export function getThemeConfig(_scheme: ColorScheme) {
   return {
